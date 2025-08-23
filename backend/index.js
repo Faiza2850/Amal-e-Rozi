@@ -1,4 +1,4 @@
-const express = require('express');
+const express = require('express'); 
 const mysql = require('mysql2');
 const cors = require('cors');
 const multer = require('multer');
@@ -8,9 +8,9 @@ const bodyParser = require('body-parser');
 const app = express();
 app.use(cors());
 app.use(bodyParser.json());
-app.use('/uploads', express.static('uploads'));
+app.use('/uploads', express.static('uploads')); // static file serving
 
-// connecting to mysql
+// ================= MySQL Connection =================
 const db = mysql.createConnection({
     host : 'localhost',
     user: 'root',
@@ -20,14 +20,14 @@ const db = mysql.createConnection({
 
 db.connect((err)=>{
     if(err){
-        console.error("Error in connecting", err);
+        console.error("❌ Error in connecting:", err);
         return;
-    }else{
-        console.log("connected to mysql");
+    } else {
+        console.log("✅ Connected to MySQL");
     }
 });
 
-/// Multer setup for file upload
+// ================= Multer Setup =================
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, 'uploads/'); 
@@ -37,40 +37,32 @@ const storage = multer.diskStorage({
     cb(null, uniqueName);
   },
 });
-
-
 const upload = multer({ storage: storage });
 
-// POST route for form data + file upload
+// ================== Customer Registration ==================
 app.post('/api/profile', upload.fields([
   { name: 'cnicFront', maxCount: 1 },
   { name: 'cnicBack', maxCount: 1 },
   { name: 'profilepic', maxCount: 1 },
 ]), (req, res) => {
   const { fullName, cnic, phone, city } = req.body;
- 
-  const cnicFront = req.files['cnicFront'][0].filename;
-  const cnicBack = req.files['cnicBack'][0].filename;
-   const profilepic = req.files['profilepic'][0].filename;
+  const cnicFront = req.files['cnicFront']?.[0]?.filename || null;
+  const cnicBack = req.files['cnicBack']?.[0]?.filename || null;
+  const profilepic = req.files['profilepic']?.[0]?.filename || null;
 
-  const sql = `INSERT INTO customers (fullName, cnic, phone, city,  cnicFront, cnicBack, profilepic)
+  const sql = `INSERT INTO customers (fullName, cnic, phone, city, cnicFront, cnicBack, profilepic)
                VALUES (?, ?, ?, ?, ?, ?, ?)`;
-  db.query(sql, [fullName, cnic, phone, city,  cnicFront, cnicBack, profilepic], (err, result) => {
+  db.query(sql, [fullName, cnic, phone, city, cnicFront, cnicBack, profilepic], (err, result) => {
     if (err) {
-      console.error('Insert error:', err);
+      console.error('❌ Insert error:', err);
       res.status(500).send('Failed to save data');
     } else {
-      res.status(200).send('Data saved successfully');
+      res.status(200).json({ message: '✅ Customer data saved', id: result.insertId });
     }
   });
 });
 
-app.listen(5000, () => {
-  console.log('Server running at http://localhost:5000');
-});
-
-
-//for workerprofile + verification 
+// ================== Worker Registration ==================
 app.post('/api/worker', upload.fields([
   { name: 'cnicFront', maxCount: 1 },
   { name: 'cnicBack', maxCount: 1 },
@@ -89,15 +81,39 @@ app.post('/api/worker', upload.fields([
 
   const sql = `
     INSERT INTO workers 
-    (fullName, cnic, phone, city, skill, available247,  cnicFront, cnicBack,  profilePic, workCert, license) 
+    (fullName, cnic, phone, city, skill, available247, cnicFront, cnicBack, profilePic, workCert, license) 
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
 
-  db.query(sql, [fullName, cnic, phone, city, skill, available247,  cnicFront, cnicBack, profilePic, workCert, license], (err, result) => {
+  db.query(sql, [fullName, cnic, phone, city, skill, available247, cnicFront, cnicBack, profilePic, workCert, license], (err, result) => {
     if (err) {
-      console.error("Worker insert error:", err);
+      console.error("❌ Worker insert error:", err);
       return res.status(500).send("Error saving worker data");
     }
-    res.send("Worker data saved successfully!");
+    res.status(200).json({ message: "✅ Worker data saved successfully!", id: result.insertId });
   });
+});
+
+// ================== Worker Profile Fetch ==================
+// GET worker profile by ID
+app.get('/api/profile/:id', (req, res) => {
+  const workerId = req.params.id;
+
+  const sql = "SELECT * FROM workers WHERE id = ?";
+  db.query(sql, [workerId], (err, result) => {
+    if (err) return res.status(500).send("Server error");
+    if (result.length === 0) return res.status(404).json({ message: "Worker not found" });
+    res.json(result[0]); 
+  });
+});
+
+
+// ================== Default Route ==================
+app.get("/", (req, res) => {
+  res.send("🚀 Amal-e-Rozi API is running...");
+});
+
+// ================== Start Server ==================
+app.listen(5000, () => {
+  console.log('🚀 Server running at http://localhost:5000');
 });
